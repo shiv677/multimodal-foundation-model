@@ -71,6 +71,8 @@ class PatchEmbedding(nn.Module):
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.shape[-2:] != (self.image_size, self.image_size):
+            raise ValueError(f"Expected image shape ({self.image_size}, {self.image_size}), got {tuple(x.shape[-2:])}")
         # x: (B, 3, H, W)
         x = self.proj(x)  # (B, embed_dim, H/P, W/P)
         x = x.flatten(2).transpose(1, 2)  # (B, num_patches, embed_dim)
@@ -250,7 +252,7 @@ class MultimodalFoundationModel(nn.Module):
             logits, _ = self.forward(images, input_tensor)
             next_token_logits = logits[0, -1, :]
 
-            if temperature <= 0.0 or temperature == 1.0:
+            if temperature <= 0.0:
                 next_token = int(torch.argmax(next_token_logits).item())
             else:
                 probs = F.softmax(next_token_logits / temperature, dim=-1)
@@ -278,6 +280,8 @@ class MultimodalFoundationModel(nn.Module):
         option_ids: List[int],
     ) -> float:
         """Compute average log likelihood score for option continuation."""
+        if not prompt_ids or not option_ids:
+            return float("-inf")
         self.eval()
         device = image.device
         if image.dim() == 3:

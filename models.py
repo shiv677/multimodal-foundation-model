@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ModelConfig(BaseModel):
@@ -15,6 +15,16 @@ class ModelConfig(BaseModel):
     mlp_dim: int = Field(default=128, ge=16)
     max_seq_len: int = Field(default=256, ge=16)
     dropout: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _validate_dimensions(self) -> "ModelConfig":
+        if self.image_size % self.patch_size != 0:
+            raise ValueError("image_size must be divisible by patch_size")
+        if self.vision_dim % self.vision_heads != 0:
+            raise ValueError("vision_dim must be divisible by vision_heads")
+        if self.text_dim % self.text_heads != 0:
+            raise ValueError("text_dim must be divisible by text_heads")
+        return self
 
 
 class VisualReasoningSample(BaseModel):

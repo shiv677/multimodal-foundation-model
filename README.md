@@ -114,14 +114,14 @@ sequenceDiagram
 
 ### Run Tests
 ```powershell
-pytest projects/multimodal_foundation_model/test_engine.py -v
+pytest test_engine.py -v
 ```
 
 ### Run Benchmark Driver
 ```powershell
 # Run benchmark on synthetic visual reasoning dataset
-python projects/multimodal_foundation_model/main.py --samples 16 --epochs 5
+python main.py --samples 16 --epochs 5
 
 # Export benchmark report to JSON
-python projects/multimodal_foundation_model/main.py --samples 8 --epochs 3 --output projects/multimodal_foundation_model/benchmark_results.json
+python main.py --samples 8 --epochs 3 --output benchmark_results.json
 ```

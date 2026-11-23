@@ -129,11 +129,22 @@ def test_model_generation(test_config, tokenizer):
     image = torch.randn(1, 3, 16, 16)
     prompt_ids = tokenizer.encode("What is this?", add_bos=True, add_eos=False)
 
-    out = model.generate(image, prompt_ids, tokenizer, max_new_tokens=8)
+    out_g1 = model.generate(image, prompt_ids, tokenizer, max_new_tokens=8, temperature=0.0)
+    out_g2 = model.generate(image, prompt_ids, tokenizer, max_new_tokens=8, temperature=0.0)
+    assert out_g1.generated_token_ids == out_g2.generated_token_ids
+
+    torch.manual_seed(123)
+    out = model.generate(image, prompt_ids, tokenizer, max_new_tokens=8, temperature=1.0)
     assert isinstance(out, InferenceOutput)
     assert len(out.generated_token_ids) <= 8
     assert isinstance(out.generated_text, str)
     assert out.latency_ms > 0.0
+    # Verify temperature > 0.0 samples across different seeds
+    sampled_seqs = set()
+    for seed in range(5):
+        torch.manual_seed(seed)
+        sampled_seqs.add(tuple(model.generate(image, prompt_ids, tokenizer, max_new_tokens=6, temperature=1.0).generated_token_ids))
+    assert len(sampled_seqs) > 1
 
 
 def test_visual_reasoning_evaluation(test_config, tokenizer):
@@ -189,13 +200,23 @@ def test_edge_cases(test_config, tokenizer):
     with pytest.raises(ValueError, match="exceeds max_seq_len"):
         model(image_single, too_long_ids)
 
+    # Empty prompt_ids or option_ids in score_option returns -inf
+    assert model.score_option(image_single, [1, 4], []) == float("-inf")
+    assert model.score_option(image_single, [], [5, 6]) == float("-inf")
+
 
 def test_config_validation():
     # Valid config
     cfg = ModelConfig(vocab_size=256, image_size=32, patch_size=8)
     assert cfg.vocab_size == 256
 
-    # Invalid config (patch size too small or dropout > 1.0)
+    # Invalid config (patch size too small or dropout > 1.0 or non-divisible dimensions)
     with pytest.raises(Exception):
         ModelConfig(dropout=1.5)
+    with pytest.raises(ValueError, match="image_size must be divisible by patch_size"):
+        ModelConfig(image_size=30, patch_size=8)
+    with pytest.raises(ValueError, match="vision_dim must be divisible by vision_heads"):
+        ModelConfig(vision_dim=32, vision_heads=3)
+    with pytest.raises(ValueError, match="text_dim must be divisible by text_heads"):
+        ModelConfig(text_dim=32, text_heads=3)
 
